@@ -1,7 +1,8 @@
-import polars as pl
+import pandas as pd
 from tqdm import tqdm
 from pathlib import Path
 from typing import List, Optional
+
 
 def list_files(dir_path: str, extension: Optional[str] = None, recursive: bool = True) -> List[str]:
     """
@@ -17,9 +18,9 @@ def list_files(dir_path: str, extension: Optional[str] = None, recursive: bool =
     else:
         pattern = "**/*" if recursive else "*"
     return [str(p.resolve()) for p in tqdm(base.rglob(pattern), desc="Lendo arquivos...") if p.is_file()]
- 
 
-def search_engine(query: str, files: list, column: str = "BAIRRO", exact_match: bool = True):
+
+def search_engine(query: str, files: list, column: str = "BAIRRO", exact_match: bool = True) -> pd.DataFrame:
     """
     Busca por 'query' na coluna especificada em todos os arquivos listados.
     Pode fazer busca exata ou por substring (case-insensitive).
@@ -28,25 +29,28 @@ def search_engine(query: str, files: list, column: str = "BAIRRO", exact_match: 
     dfs = []
 
     for arquivo in tqdm(files, desc="Buscando"):
-        df = pl.read_csv(
+        df = pd.read_csv(
             arquivo,
-            separator=";",
-            encoding="utf8-lossy",
-            infer_schema=False,
+            sep=";",
+            encoding="utf-8",
+            dtype=str,       # garante leitura como string
+            low_memory=False
         )
-        
-        df = df.with_columns(pl.col(column).cast(pl.Utf8))
+
+        if column not in df.columns:
+            continue
+
+        df[column] = df[column].astype(str).str.lower()
 
         # Se busca exata
         if exact_match:
-            df_match = df.filter(pl.col(column).str.to_lowercase() == q_lower)
-            
+            df_match = df[df[column] == q_lower]
         # Se busca por substring
         else:
-            df_match = df.filter(pl.col(column).str.to_lowercase().str.contains(q_lower))
+            df_match = df[df[column].str.contains(q_lower, na=False)]
 
-        if df_match.height > 0:
-            df_match = df_match.with_columns(pl.lit(arquivo.split("\\")[-1]).alias("_arquivo"))
+        if not df_match.empty:
+            df_match["_arquivo"] = Path(arquivo).name
             dfs.append(df_match)
-    
-    return pl.concat(dfs, how="vertical") if dfs else pl.DataFrame({}, schema=[column])
+
+    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame(columns=[column])
