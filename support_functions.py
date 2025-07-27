@@ -1,5 +1,4 @@
 import pandas as pd
-from tqdm import tqdm
 from pathlib import Path
 from typing import List, Optional
 
@@ -17,7 +16,7 @@ def list_files(dir_path: str, extension: Optional[str] = None, recursive: bool =
         pattern = f"**/*{ext}" if recursive else f"*{ext}"
     else:
         pattern = "**/*" if recursive else "*"
-    return [str(p.resolve()) for p in tqdm(base.rglob(pattern), desc="Lendo arquivos...") if p.is_file()]
+    return [str(p.resolve()) for p in base.rglob(pattern) if p.is_file()]
 
 
 def search_engine(query: str, files: list, column: str = "BAIRRO", exact_match: bool = True) -> pd.DataFrame:
@@ -28,7 +27,7 @@ def search_engine(query: str, files: list, column: str = "BAIRRO", exact_match: 
     q_lower = query.lower()
     dfs = []
 
-    for arquivo in tqdm(files, desc="Buscando"):
+    for arquivo in files:
         df = pd.read_csv(
             arquivo,
             sep=";",
